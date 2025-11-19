@@ -19,53 +19,106 @@ https://github.com/durganaresh83/flask_Practice.git
 Create a Jenkinsfile in the root directory of your project: <br>
 
 pipeline { <br>
-    agent any <br>
+    agent any
+   
+    stages {
+        stage('Checkout') {
+            steps {
+                echo "Checking out source code..."
+                checkout scm
+            }
+        }
 
-    stages { <br>
+        stage('Build') {
+            steps {
+                echo "Creating virtual environment and installing dependencies..."
+                sh '''
+                    python3 -m venv venv
+                    . venv/bin/activate
+                    pip install --upgrade pip
+                    pip install -r requirements.txt
+                '''
+            }
+        }
 
-        stage('Build') { <br>
-            steps { <br>
-                echo "Installing dependencies..." <br>
-                sh 'pip3 install -r requirements.txt' <br>
-            } <br>
-        } <br>
+        stage('Test') {
+            steps {
+                echo "Starting temporary MongoDB container for tests..."
+                sh '''
+                    docker run -d -p 27017:27017 --name test-mongo mongo:latest
+                '''
 
-        stage('Test') { <br>
-            steps { <br>
-                echo "Running tests..." <br>
-                sh 'pytest || exit 1' <br>
-            } <br>
-        } <br>
+                echo "Running unit tests..."
+                sh '''
+                    . venv/bin/activate
+                    export MONGO_URI="mongodb://localhost:27017/testdb"
+                    pytest
+                '''
 
-        stage('Deploy') { <br>
-            when { <br>
-                expression { <br>
-                    currentBuild.result == null || currentBuild.result == 'SUCCESS' <br>
-                } <br>
-            } <br>
-            steps { <br>
-                echo "Deploying Flask app to staging environment..." <br>
-                sh ''' <br>
-                    # Example simple deployment <br>
-                    nohup python3 app.py & <br>
-                ''' <br>
-            } <br>
-        } <br>
-    } <br>
+                echo "Stopping and removing MongoDB test container..."
+                sh '''
+                    docker stop test-mongo
+                    docker rm test-mongo
+                '''
+            }
+        }
 
-    post { <br>
-        success { <br>
-            emailext subject: "Build Successful: ${env.JOB_NAME}", <br>
-                     body: "The Jenkins build was successful.", <br>
-                     recipientProviders: [developers()] <br>
-        } <br>
-        failure { <br>
-            emailext subject: "Build Failed: ${env.JOB_NAME}", <br>
-                     body: "The Jenkins build has failed.", <br>
-                     recipientProviders: [developers()] <br>
-        } <br>
-    } <br>
-} <br>
+        stage('Deploy') {
+            when {
+                expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' }
+            }
+            steps {
+                echo "Deploying Flask app to staging environment..."
+
+                // Kill previous instance if it's running
+                sh '''
+                    pkill -f "python3 app.py" || true
+                '''
+
+                // Start new instance
+                sh '''
+                    . venv/bin/activate
+                    nohup python3 app.py > app.log 2>&1 &
+                '''
+            }
+        }
+
+        stage('Health Check') {
+            steps {
+                echo "Performing post-deployment health check..."
+
+                sh '''
+                    sleep 5  # give Flask app time to start
+
+                    STATUS=$(curl -o /dev/null -s -w "%{http_code}" http://localhost:5000)
+
+                    if [ "$STATUS" -ne 200 ]; then
+                        echo "❌ Health check failed. App returned HTTP $STATUS"
+                        exit 1
+                    else
+                        echo "✅ Health check passed. Flask app is running successfully!"
+                    fi
+                '''
+            }
+        }
+    }
+    post {
+        success {
+            emailext(
+                subject: "Build Successful: ${env.JOB_NAME}",
+                body: "The Jenkins build was successful.",
+                to: "xxxxxxxxxxxxxxxxxx@gmail.com"
+            )
+        }
+        failure {
+            emailext(
+                subject: "Build Failed: ${env.JOB_NAME}",
+                body: "The Jenkins build has failed.",
+                to: "xxxxxxxxxxxxx@gmail.com"
+            )
+        }
+    }
+}
 
 # Create a Jenkins Pipeline Job -  Follow the steps below to create the Jenkins job
 **Steps:**
@@ -133,6 +186,7 @@ In this stage, clone the repository to the Jenkins node <br>
 <img width="1203" height="810" alt="image" src="https://github.com/user-attachments/assets/bfcbd518-fdbf-42a7-a249-932fb79580be" />
 
 
+
 **From the requirements.txt, install the required software <br>**
 
 <img width="1396" height="818" alt="image" src="https://github.com/user-attachments/assets/90eac46d-6bbc-4ab8-a243-8ea398784cd0" />
@@ -144,8 +198,8 @@ In the testing stage, I am pulling the MongoDB Docker image <br>
 
 <img width="1252" height="808" alt="image" src="https://github.com/user-attachments/assets/e78967b6-1131-4f9e-96b1-eb19e3a33ed0" />
 
-Once the image is pulled, running the unit test cases <br>
 
+Once the image is pulled, running the unit test cases <br>
 
 <img width="1065" height="771" alt="image" src="https://github.com/user-attachments/assets/4f681739-5d9a-494e-9821-c5f883ab2026" />
 
@@ -160,6 +214,7 @@ In the deploy stage, deploy the Flask application <br>
 <img width="1252" height="812" alt="image" src="https://github.com/user-attachments/assets/00d22ce6-1ba1-4e25-b123-dcc1690ec482" />
 
 
+
 After the deployment, checking the health status of the application <br>
 
 <img width="946" height="536" alt="image" src="https://github.com/user-attachments/assets/39afb3cd-857e-4754-8dd7-ad5b1686ca00" />
@@ -170,6 +225,7 @@ After the deployment, checking the health status of the application <br>
 A notification system to alert via email when the build process fails or succeeds. <br>
 
 <img width="822" height="427" alt="image" src="https://github.com/user-attachments/assets/6de90074-3843-480f-94c1-1c0220f2f498" />
+
 
 **6. Webhook trigger** <br>
  I have done a small update in the README.md file, and the job triggered automatically. <br>
