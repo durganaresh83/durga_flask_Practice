@@ -1,6 +1,6 @@
 # Jenkins CI/CD Pipeline Assignment
 
-# Open Cloud Jenkins
+# Open Jenkins Application
 https://jenkinsacademics.herovired.com/
 
 # Install required Jenkins plugins
