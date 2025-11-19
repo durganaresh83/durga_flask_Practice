@@ -171,3 +171,9 @@ A notification system to alert via email when the build process fails or succeed
 
 <img width="822" height="427" alt="image" src="https://github.com/user-attachments/assets/6de90074-3843-480f-94c1-1c0220f2f498" />
 
+**6. Webhook trigger** <br>
+ I have done a small update in the README.md file, and the job triggered automatically. <br>
+
+ <img width="1037" height="427" alt="image" src="https://github.com/user-attachments/assets/19b64211-61f5-4320-8d3a-064694eb9dc7" />
+
+
